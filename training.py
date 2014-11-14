@@ -2,16 +2,17 @@
 
 import shutil
 import datetime as dt
+import argparse
 
 import mechanize
 import csv
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 
-username = 'set me'
-password = 'set me'
+username = 'cristina'
+password = 'fillmein'
 
-# TODO: use pandas...
 # TODO: consider using Counter class from collections to count neat stats 
 # TODO: small sql db for learning/easy querying?
 
@@ -19,73 +20,45 @@ password = 'set me'
 # http://attackpoint.org/printtraining.jsp?userid=470&isplan=0&outtype=csv
 
 def main():
+    parser = argparse.ArgumentParser(description='Plot training stuff')
+    parser.add_argument('--fetch', action='store_true', default=False)    
+    parser.add_argument('-s', '--start', help='Start date in format yyyy-mm-dd',  
+                    type=lambda s: dt.datetime.strptime(s, '%Y-%m-%d'), required=False)
+    parser.add_argument('-e', '--end', help='End date in format yyyy-mm-dd', required=False,
+                    type=lambda s: dt.datetime.strptime(s, '%Y-%m-%d'))
 
-    get_data()
+    args = parser.parse_args()
+    if args.fetch:
+        get_data()
 
     filename = 'test.csv'
-    with open(filename, 'r') as f:
-        logreader = csv.DictReader(f)
-        log = [row for row in logreader]
+    df = pd.read_csv(filename, parse_dates=[0])
+    df = df.set_index(pd.DatetimeIndex(df['date']))
 
-    # Make entry dates play nice with datetime
-    for entry in log:
-        entry['date'] = dt.datetime.strptime(entry['date'], '%Y-%m-%d')
-
-    week = dt.timedelta(days=7)
+    running = df[df['activity'] == 'Running']
     start = dt.datetime(2014, 9, 16)
     end = dt.datetime(2014, 11, 16)
-
-    runpoints = []
-    skipoints = []
-    runactivities = ('Running', 'Orienteering')
-    skiactivities = ('XC Skiing', 'Ski Orienteering')
-    var = 'distance(km)'
-    #var = 'controls'
-    for day in datespan(start, end):
-        values = subset(log, var, runactivities, day, day+week)
-        distance = sum(values)
-        runpoints.append((day, distance))
-
-        values = subset(log, var, skiactivities, day, day+week)
-        distance = sum(values)
-        skipoints.append((day, distance))
+    running = running[running['date'] > start]
+    running = running.resample('W', how='sum')   
 
     plt.xkcd()
     fig, ax = plt.subplots(1)
-
-    x, y = zip(*runpoints)
-    #ax.scatter(x, y)
-    #x, y = zip(*skipoints)
-    #ax.scatter(x, y, color='black')
     plt.title('Weekly km, orienteering + running')
-    #plt.ylim(ymin=0)
-
-    rects1 = ax.bar(x, y, 3, color='white', linewidth=2)
+    rects1 = ax.bar(running.index, running['distance(km)'], 3, color='white', linewidth=2)
     ax.xaxis_date()
-
-    # rotate and align the tick labels so they look better
     fig.autofmt_xdate()
-    #leg = ax.legend(loc='best', fancybox=True, numpoints=1)
-    #leg.get_frame().set_alpha(0.5)
-
-
+    
+    #plt.savefig('test.png')
     plt.show()
 
-
-    #points = [(x['date'], float(x['distance(km)'])) for x in log if (
-    #        (x['activity'] == 'Running' or x['activity'] == 'Orienteering') and len(x['distance(km)']) > 0)]
-
-
-    #startdate = min([e['date'] for e in iter(log)])
-
-    #hack
-    #startdate = dt.date(2002,11,18) # a monday
+    
 
 def get_data():
     ''' Use mechanize to browse AP and retrieve my training.'''
     # TODO: save username and password somewhere hidden and open as config
     # TODO: change userid of form, uncheck boxes, etc
     br = mechanize.Browser()
+    br.set_handle_robots(False)
     br.open("http://attackpoint.org")
     br.select_form(nr=0)
     br.form['username'] = username
