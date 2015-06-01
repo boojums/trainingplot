@@ -10,8 +10,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-username = 'cristina'
-password = 'fillmein'
+from settings import *
 
 # TODO: consider using Counter class from collections to count neat stats 
 # TODO: small sql db for learning/easy querying?
@@ -29,11 +28,26 @@ def main():
 
     args = parser.parse_args()
     if args.fetch:
-        get_data()
+        data = get_all_training_data()
+
+    with open('test.csv', 'w') as f:
+        shutil.copyfileobj(data, f)
 
     filename = 'test.csv'
-    df = pd.read_csv(filename, parse_dates=[0])
+    columns = ["date","hour","activity","workout","keywords",
+                "time","i0","i1","i2","i3","i4","i5",
+                "distance(km)","climb(m)","intensity","t-intensity",
+                "ahr","mhr","controls","spiked","rhr","sleep",
+                "weight(kg)","injured","sick","restday","shoes","route",
+                "description","private note"]
+    df = pd.read_csv(filename, parse_dates=[0], names=columns, skiprows=[0])
     df = df.set_index(pd.DatetimeIndex(df['date']))
+    
+    # Not good for exact dates b/c leap years
+    #df['doy'] = df.index.dayofyear
+    df['month'] = map(lambda date: date.month, df['date'])
+    df['dom'] = map(lambda date: date.day, df['date'])
+    df['moday'] = map(lambda month, day:str(month) + '-' + str(day), df['month'], df['dom'])
 
     running = df[df['activity'] == 'Running']
     start = dt.datetime(2014, 9, 16)
@@ -48,21 +62,87 @@ def main():
     ax.xaxis_date()
     fig.autofmt_xdate()
     
-    #plt.savefig('test.png')
-    plt.show()
+    plt.savefig('test.png')
+    #plt.show()
 
+def orienteering_days_of_year(data):
+    ''' Get list of days of the year where activity has occurreed. ''' 
+    orienteering = df[df['activity'] == 'Orienteering']
+    modays = df.moday.unique()
+    alldates = [str(x.month) + '-' + str(x.day) for x in [dt.date(1996, 1,1)+dt.timedelta(days=i) for i in range(366)]]
+    missing = [x for x in alldates if x not in modays]
+
+def plot_missing_days(data):
+    from collections import OrderedDict
+
+    from bokeh.plotting import ColumnDataSource, figure, show, output_file
+    from bokeh.models import HoverTool
     
+    colors = [
+        '#ffffff', '#efedf5', '#dadaeb', '#bcbddc', '#9e9ac8', '#807dba', '#6a51a3', '#54278f', '#3f007d'
+    ]
+    months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+    days = range(1, 32)
+    # We need to have values for every
+    # pair of month/day names. Map the count to a color.
+    month = []
+    day = []
+    color = []
+    count = []
+    counts = data.moday.value_counts()
+    for x, m in enumerate(months):
+        for d in days:
+            month.append(m)
+            day.append(d)
+            try:
+                daily_count = counts[str(x+1)+'-'+str(d)]
+            except KeyError:
+                daily_count = 0
+            count.append(daily_count)
+            c = 0 if daily_count == 0 else min(daily_count, 8)
+            color.append(colors[c])
 
-def get_data():
+    source = ColumnDataSource(
+        data=dict(month=month, day=day, color=color, count=count)
+    )
+
+    output_file('orienteering_days.html')
+
+    TOOLS = "resize,hover,save,pan,box_zoom,wheel_zoom"
+
+    p = figure(title="Orienteering days (2003 - 2015)",
+        x_range=[1,31], y_range=list(reversed(months)),
+        x_axis_location="above", plot_width=900, plot_height=400,
+        toolbar_location="left", tools=TOOLS)
+
+    p.rect("day", "month", 1, 1, source=source,
+        color="color", line_color=None)
+
+    p.grid.grid_line_color = None
+    p.axis.axis_line_color = None
+    p.axis.major_tick_line_color = None
+    p.axis.major_label_text_font_size = "5pt"
+    p.axis.major_label_standoff = 0
+    p.xaxis.major_label_orientation = np.pi/3
+
+    hover = p.select(dict(type=HoverTool))
+    hover.tooltips = OrderedDict([
+        ('date', '@month @day'),
+        ('count', '@count'),
+    ])
+
+    show(p)      # show the plot    
+
+
+def get_all_training_data():
     ''' Use mechanize to browse AP and retrieve my training.'''
-    # TODO: save username and password somewhere hidden and open as config
     # TODO: change userid of form, uncheck boxes, etc
     br = mechanize.Browser()
     br.set_handle_robots(False)
     br.open("http://attackpoint.org")
     br.select_form(nr=0)
-    br.form['username'] = username
-    br.form['password'] = password
+    br.form['username'] = USERNAME
+    br.form['password'] = PASSWORD
     br.submit()
 
     br.open("http://attackpoint.org/reports.jsp")
@@ -73,8 +153,8 @@ def get_data():
     br['toselected'] = 0
 
     data = br.submit()
-    with open('test.csv', 'w') as f:
-        shutil.copyfileobj(data, f)
+    
+    return data
 
 def datespan(startdate, enddate, delta=dt.timedelta(days=7)):
     """ Generate iterable of dates."""
