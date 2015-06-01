@@ -27,14 +27,22 @@ def main():
                     type=lambda s: dt.datetime.strptime(s, '%Y-%m-%d'), required=False)
     parser.add_argument('-e', '--end', help='End date in format yyyy-mm-dd', required=False,
                     type=lambda s: dt.datetime.strptime(s, '%Y-%m-%d'))
+    parser.add_argument('-f', '--filename', required=False)
+    parser.add_argument('-n', '--name', required=False)
 
     args = parser.parse_args()
     if args.fetch:
+        filename = 'test.csv'
         data = get_all_training_data()
         with open('test.csv', 'w') as f:
             shutil.copyfileobj(data, f)
+        name = 'Cristina'
 
-    filename = 'test.csv'
+    if args.filename:
+        filename = args.filename
+        if args.name:
+            name = args.name
+
     columns = ["date","hour","activity","workout","keywords",
                 "time","i0","i1","i2","i3","i4","i5",
                 "distance(km)","climb(m)","intensity","t-intensity",
@@ -50,6 +58,10 @@ def main():
     df['dom'] = map(lambda date: date.day, df['date'])
     df['moday'] = map(lambda month, day:str(month) + '-' + str(day), df['month'], df['dom'])
 
+    df = df[df['activity']=='Orienteering']
+    plot_day_counts(df, name)
+
+def plot_xkcd(data):
     running = df[df['activity'] == 'Running']
     start = dt.datetime(2014, 9, 16)
     end = dt.datetime(2014, 11, 16)
@@ -73,7 +85,7 @@ def orienteering_days_of_year(data):
     alldates = [str(x.month) + '-' + str(x.day) for x in [dt.date(1996, 1,1)+dt.timedelta(days=i) for i in range(366)]]
     missing = [x for x in alldates if x not in modays]
 
-def plot_missing_days(data):
+def plot_day_counts(data, name='test'):
     from collections import OrderedDict
 
     from bokeh.plotting import ColumnDataSource, figure, show, output_file, save
@@ -107,11 +119,12 @@ def plot_missing_days(data):
         data=dict(month=month, day=day, color=color, count=count)
     )
 
-    output_file('orienteering_days.html', mode="cdn")
+    filename = 'odays_{}.html'.format(name.lower())
+    output_file(filename, mode="cdn")
 
     TOOLS = "resize,hover,save,pan,box_zoom,wheel_zoom"
 
-    p = figure(title="Cristina's orienteering sessions per day of year",
+    p = figure(title="{}'s orienteering sessions per day of year".format(name),
         x_range=[1,31], y_range=list(reversed(months)),
         x_axis_location="above", plot_width=900, plot_height=400,
         toolbar_location="left", tools=TOOLS)
