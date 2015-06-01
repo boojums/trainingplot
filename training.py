@@ -6,6 +6,8 @@ import argparse
 
 import mechanize
 import csv
+import matplotlib
+matplotlib.use('Agg')   # necessary for remote usage to avoid DISPLAY error
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -29,9 +31,8 @@ def main():
     args = parser.parse_args()
     if args.fetch:
         data = get_all_training_data()
-
-    with open('test.csv', 'w') as f:
-        shutil.copyfileobj(data, f)
+        with open('test.csv', 'w') as f:
+            shutil.copyfileobj(data, f)
 
     filename = 'test.csv'
     columns = ["date","hour","activity","workout","keywords",
@@ -75,7 +76,7 @@ def orienteering_days_of_year(data):
 def plot_missing_days(data):
     from collections import OrderedDict
 
-    from bokeh.plotting import ColumnDataSource, figure, show, output_file
+    from bokeh.plotting import ColumnDataSource, figure, show, output_file, save
     from bokeh.models import HoverTool
     
     colors = [
@@ -106,11 +107,11 @@ def plot_missing_days(data):
         data=dict(month=month, day=day, color=color, count=count)
     )
 
-    output_file('orienteering_days.html')
+    output_file('orienteering_days.html', mode="cdn")
 
     TOOLS = "resize,hover,save,pan,box_zoom,wheel_zoom"
 
-    p = figure(title="Orienteering days (2003 - 2015)",
+    p = figure(title="Cristina's orienteering sessions per day of year",
         x_range=[1,31], y_range=list(reversed(months)),
         x_axis_location="above", plot_width=900, plot_height=400,
         toolbar_location="left", tools=TOOLS)
@@ -131,7 +132,7 @@ def plot_missing_days(data):
         ('count', '@count'),
     ])
 
-    show(p)      # show the plot    
+    save(p)      # show the plot    
 
 
 def get_all_training_data():
