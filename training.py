@@ -3,39 +3,38 @@
 import shutil
 import datetime as dt
 import argparse
-import datetime as dt
 from collections import OrderedDict
 
 import mechanize
-import csv
 import matplotlib
 matplotlib.use('Agg')   # necessary for remote usage to avoid DISPLAY error
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from bokeh.plotting import ColumnDataSource, figure, show, output_file, save
+from bokeh.plotting import ColumnDataSource, figure, show, output_file
 from bokeh.models import HoverTool
 
 from settings import *
 
 
-months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+          "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
-# TODO: consider using Counter class from collections to count neat stats 
-# TODO: small sql db for learning/easy querying?
 
 # http://attackpoint.org/printtraining.jsp?userid=470&from-month=11&from-day=14&from-year=2014&to-month=11&to-day=14&to-year=2014&isplan=0&outtype=csv
 # http://attackpoint.org/printtraining.jsp?userid=470&isplan=0&outtype=csv
 
+
 def main():
     parser = argparse.ArgumentParser(description='Plot training stuff')
-    parser.add_argument('--fetch', action='store_true', default=False)    
-    parser.add_argument('-s', '--start', help='Start date in format yyyy-mm-dd',  
-                    type=lambda s: dt.datetime.strptime(s, '%Y-%m-%d'), required=False)
-    parser.add_argument('-e', '--end', help='End date in format yyyy-mm-dd', required=False,
-                    type=lambda s: dt.datetime.strptime(s, '%Y-%m-%d'))
+    parser.add_argument('--fetch', action='store_true', default=False)
+    parser.add_argument('-s', '--start', help='Start date in format yyyy-mm-dd',
+                        type=lambda s: dt.datetime.strptime(s, '%Y-%m-%d'),
+                        required=False)
+    parser.add_argument('-e', '--end', help='End date in format yyyy-mm-dd',
+                        required=False,
+                        type=lambda s: dt.datetime.strptime(s, '%Y-%m-%d'))
     parser.add_argument('-f', '--filename', required=False)
-    parser.add_argument('-n', '--name', required=False)
 
     args = parser.parse_args()
     if args.fetch:
@@ -43,29 +42,26 @@ def main():
         data = get_all_training_data()
         with open('test.csv', 'w') as f:
             shutil.copyfileobj(data, f)
-        name = 'Cristina'
 
     if args.filename:
         filename = args.filename
-        if args.name:
-            name = args.name
 
-    columns = ["date","hour","activity","workout","keywords",
-                "time","i0","i1","i2","i3","i4","i5",
-                "distance(km)","climb(m)","intensity","t-intensity",
-                "ahr","mhr","controls","spiked","rhr","sleep",
-                "weight(kg)","injured","sick","restday","shoes","route",
-                "description","private note"]
+    columns = ["date", "hour", "activity", "workout", "keywords",
+                "time", "i0", "i1", "i2", "i3", "i4", "i5",
+                "distance(km)", "climb(m)", "intensity", "t-intensity",
+                "ahr", "mhr", "controls", "spiked", "rhr", "sleep",
+                "weight(kg)", "injured", "sick", "restday", "shoes", "route",
+                "description", "private note"]
     df = pd.read_csv(filename, parse_dates=[0], names=columns, skiprows=[0])
     df = df.set_index(pd.DatetimeIndex(df['date']))
-    
+
     # Not good for exact dates b/c leap years
     #df['doy'] = df.index.dayofyear
     df['month'] = map(lambda date: date.month, df['date'])
     df['dom'] = map(lambda date: date.day, df['date'])
     df['moday'] = map(lambda month, day:str(month) + '-' + str(day), df['month'], df['dom'])
 
-    df = df[df['activity']=='Orienteering']
+    df = df[df['activity'] == 'Orienteering']
 
     jjdata = read_jj('data/jj.txt')
     source = get_day_counts_diff_source(jjdata, df)
@@ -76,6 +72,7 @@ def main():
     #filename = 'cristina_jj.html'
     #p = vplot(s1,s2,s3)
     #save(p)
+
 
 def plot_xkcd(data):
     running = df[df['activity'] == 'Running']
@@ -90,19 +87,21 @@ def plot_xkcd(data):
     rects1 = ax.bar(running.index, running['distance(km)'], 3, color='white', linewidth=2)
     ax.xaxis_date()
     fig.autofmt_xdate()
-    
+
     plt.savefig('test.png')
     #plt.show()
 
+
 def orienteering_days_of_year(data):
-    ''' Get list of days of the year where activity has occurreed. ''' 
+    ''' Get list of days of the year where activity has occurreed. '''
     orienteering = df[df['activity'] == 'Orienteering']
     modays = df.moday.unique()
     alldates = [str(x.month) + '-' + str(x.day) for x in [dt.date(1996, 1,1)+dt.timedelta(days=i) for i in range(366)]]
     missing = [x for x in alldates if x not in modays]
 
+
 def get_day_counts_source(data):
-    
+
     colors = [
         '#ffffff', '#efedf5', '#dadaeb', '#bcbddc', '#9e9ac8', '#807dba', '#6a51a3', '#54278f', '#3f007d'
     ]
@@ -133,7 +132,7 @@ def get_day_counts_source(data):
     return source
 
 def get_day_counts_diff_source(data1, data2):
-    
+
     colors = [
         '#af8dc3', '#f7f7f7', '#7fbf7b', '#666666'
         ]
@@ -184,6 +183,7 @@ def get_day_counts_diff_source(data1, data2):
 
     return source
 
+
 def plot_counts_data(source, title='Test'):
     ''' Create day/month grid plot of data. 
     source is a ColumnDataSource with month, day, color, count
@@ -216,7 +216,7 @@ def plot_counts_data(source, title='Test'):
     ])
 
     #return p
-    show(p)      # show the plot    
+    show(p)      # show the plot
 
 
 def read_jj(filename):
@@ -232,6 +232,7 @@ def read_jj(filename):
     data = pd.DataFrame({'date': dates, 'month':month , 'dom': dom, 'moday':moday})
 
     return data
+
 
 def get_all_training_data():
     ''' Use mechanize to browse AP and retrieve my training.'''
@@ -252,8 +253,9 @@ def get_all_training_data():
     br['toselected'] = 0
 
     data = br.submit()
-    
+
     return data
+
 
 def datespan(startdate, enddate, delta=dt.timedelta(days=7)):
     """ Generate iterable of dates."""
@@ -262,13 +264,15 @@ def datespan(startdate, enddate, delta=dt.timedelta(days=7)):
         yield currentdate
         currentdate += delta
 
-def subset(log, var, activities, startdate=None, enddate=None):
-    """ Return sum of var for all activities in the date range (startdate inclusive)."""
-    if startdate == None or enddate == None:
-        values = [float(x[var]) for x in log if len(x[var]) > 0 and x['activity'] in activities]
-    else:
-        values = [float(x[var]) for x in log if (len(x[var]) > 0 and (startdate <= x['date'] < enddate)) and x['activity'] in activities]
-    return values
+
+def subset(log, activities, startdate=None, enddate=None):
+    """ Return subset for given activities in the date range (startdate inclusive)."""
+    subset = log[log['activity'].isin(activities)]
+
+    if startdate and enddate:
+        subset = subset[(subset['date'] >= startdate) & (subset['date'] < enddate)]
+
+    return subset
 
 if __name__ == '__main__':
     main()
